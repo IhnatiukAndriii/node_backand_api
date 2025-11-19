@@ -1,3 +1,4 @@
+import { findOrCreateUser } from '../services/user.service';
 import { Request, Response, NextFunction } from 'express';
 export async function handlePrompt(
   req: Request,
@@ -12,12 +13,20 @@ export async function handlePrompt(
         message: 'text and phone_number are required',
       });
     }
+    const user = await findOrCreateUser(phone_number);
+    
+    return res.status(400).json({
+      message : ''
 
-    return res.status(200).json({
+
+
+
+
+ /*   return res.status(200).json({
       receiveText: text,
       receivePhoneNumber: phone_number,
     });
   } catch (error) {
     next(error);
   }
-}
+} */
