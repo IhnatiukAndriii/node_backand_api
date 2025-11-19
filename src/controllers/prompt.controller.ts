@@ -1,5 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
-import { addMessageToConversation } from '../services/conversation.service';
+import {
+	addMessageToConversation,
+	getMessages,
+} from '../services/conversation.service';
+import { sendChatRequest } from '../services/openai.service';
+import SYSTEM_PROMPT from '../services/prompts/system.prompt';
 
 export async function handlePrompt(
 	req: Request,
@@ -16,23 +21,27 @@ export async function handlePrompt(
 				.json({ message: 'userId and content are required' });
 		}
 
-		const userMessages = await addMessageToConversation(
-			userId,
-			'user',
-			content,
-		);
+		await addMessageToConversation(userId, 'user', content);
 
-		const aiReplyContent = 'Stub response from assistant';
+		const history = await getMessages(userId);
 
-		const aiMessages = await addMessageToConversation(
+		const messages = [
+			{ role: 'system' as const, content: SYSTEM_PROMPT },
+			...history,
+		];
+
+		const aiResponse = await sendChatRequest(messages);
+		const replyContent = aiResponse.content;
+
+		const allMessages = await addMessageToConversation(
 			userId,
 			'assistant',
-			aiReplyContent,
+			replyContent,
 		);
 
 		return res.status(200).json({
-			messages: aiMessages,
-			reply: aiReplyContent,
+			messages: allMessages,
+			reply: replyContent,
 		});
 	} catch (error) {
 		next(error);
