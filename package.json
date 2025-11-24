@@ -13,7 +13,8 @@
     "migrate": "ts-node migrate.ts",
     "migrate:rollback": "ts-node migrate.ts rollback",
     "lint": "eslint src/**/*.ts",
-    "format": "prettier --write \"src/**/*.ts\""
+    "format": "prettier --write \"src/**/*.ts\"",
+    "reset-user": "ts-node ./scripts/resetUser.ts"
   },
   "keywords": [
     "habits",
