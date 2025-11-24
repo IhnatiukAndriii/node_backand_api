@@ -1,5 +1,7 @@
+import { stat } from 'fs';
 import db from '../config/database';
 import { ParsedIntent } from './openai.service';
+import e from 'express';
 
 export interface Habit {
     id: number;
@@ -38,4 +40,57 @@ export async function listHabitsByUser(userId: number): Promise<Habit[]> {
         .orderBy('created_at', 'asc');
 
     return habits;
+}
+export async function getHabitById(habitId: number): Promise<Habit | null> {
+    const habit = await db<Habit>('habits')
+        .where({ id: habitId })
+        .first();
+    return habit || null;   
+}
+export async function findHabitByName(
+    userId: number,
+    habitName: string,
+): Promise<Habit | null> {
+    const habit = await db<Habit>('habits')
+        .where({ user_id: userId, habit_name: habitName, status: 'active' })
+        .first();
+    return habit || null;
+}
+export async function updateHabit(
+    habitId: number,
+    habitData: Partial<{
+        habit_name: string;
+        frequency_type: string;
+        frequency_times: number | string[];
+    }>,
+): Promise<Habit | null> {
+    const existing = await getHabitById(habitId);
+    if (!existing) return null;
+
+    const updated = await db<Habit>('habits')
+        .where({ id: habitId })
+        .update({
+            habit_name: habitData.habit_name ?? existing.habit_name,
+            frequency_type: habitData.frequency_type ?? existing.frequency_type,
+            frequency_times: habitData.frequency_times !== undefined
+                ? Array.isArray(habitData.frequency_times)
+                    ? JSON.stringify(habitData.frequency_times)
+                    : String(habitData.frequency_times)
+                : existing.frequency_times,
+            updated_at: db.fn.now(),
+        })
+        .returning('*');
+    const row = Array.isArray(updated) ? updated[0] : updated;
+    return row as Habit;
+}
+export async function deleteHabit(habitId: number): Promise<boolean> {
+    const existing = await getHabitById(habitId);
+    if (!existing) return false;
+    await db<Habit>('habits')
+        .where({ id: habitId })
+        .update({
+            status: 'deleted',
+            updated_at: db.fn.now(),
+        });
+    return true;
 }
