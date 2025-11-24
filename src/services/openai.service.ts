@@ -28,14 +28,15 @@ export interface OpenAIResponse {
 export async function sendChatRequest(
 	messages: ConversationMessage[],
 ): Promise<OpenAIResponse> {
+	const model = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+	console.log('>>> sendChatRequest USING MODEL:', model);
+
 	const response = await openai.chat.completions.create({
-		model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+		model,
 		messages: messages.map((m) => ({ role: m.role, content: m.content })),
-		response_format: { type: 'json_object' },
 	});
 
 	const content = response.choices[0]?.message?.content ?? '';
-
 	return { content };
 }
 
