@@ -35,10 +35,13 @@ export async function createHabit(
 }
 
 export async function listHabitsByUser(userId: number): Promise<Habit[]> {
+    console.log('>>> listHabitsByUser called with userId:', userId);
     const habits = await db<Habit>('habits')
-        .where({ user_id: userId })
+        .where({ user_id: userId, status: 'active' })
         .orderBy('created_at', 'asc');
 
+    console.log('>>> Found habits:', habits.length, 'habits');
+    console.log('>>> Habits data:', JSON.stringify(habits, null, 2));
     return habits;
 }
 export async function getHabitById(habitId: number): Promise<Habit | null> {

@@ -10,7 +10,7 @@ import {
   parseOpenAIResponse,
   ConversationMessage,
 } from '../services/openai.service';
-import { createHabit, listHabitsByUser } from '../services/habit.service';
+import { createHabit, listHabitsByUser, deleteHabit, updateHabit, findHabitByName } from '../services/habit.service';
 
 export async function handlePrompt(
   req: Request,
@@ -50,12 +50,50 @@ export async function handlePrompt(
       JSON.stringify(parsedIntent),
     );
 
-    let result: unknown = null;
-    if (parsedIntent.action === 'create') {
-      result = await createHabit(user.id, parsedIntent);
-    } else if (parsedIntent.action === 'list') {
-      result = await listHabitsByUser(user.id);
-    }
+   let result: unknown = null;
+if (parsedIntent.action === 'create') {
+  result = await createHabit(user.id, parsedIntent);
+} else if (parsedIntent.action === 'list') {
+  result = await listHabitsByUser(user.id);
+} else if (parsedIntent.action === 'update') {
+  // UPDATE: потрібно знайти звичку по імені
+  if (!parsedIntent.habit_name) {
+    return res.status(400).json({
+      message: 'habit_name is required for update action',
+    });
+  }
+  
+  const habitToUpdate = await findHabitByName(user.id, parsedIntent.habit_name);
+  
+  if (!habitToUpdate) {
+    return res.status(404).json({
+      message: `Habit "${parsedIntent.habit_name}" not found`,
+    });
+  }
+  
+  result = await updateHabit(habitToUpdate.id, {
+    habit_name: parsedIntent.habit_name,
+    frequency_type: parsedIntent.frequency_type,
+    frequency_times: parsedIntent.frequency_times,
+  });
+} else if (parsedIntent.action === 'delete') {
+  if (!parsedIntent.habit_name) {
+    return res.status(400).json({
+      message: 'habit_name is required for delete action',
+    });
+  }
+  
+  const habitToDelete = await findHabitByName(user.id, parsedIntent.habit_name);
+  
+  if (!habitToDelete) {
+    return res.status(404).json({
+      message: `Habit "${parsedIntent.habit_name}" not found`,
+    });
+  }
+  
+  await deleteHabit(habitToDelete.id);
+  result = { message: 'Habit deleted successfully' };
+}
 
     return res.status(200).json({
       phone_number: user.phone_number,
