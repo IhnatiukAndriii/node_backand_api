@@ -1,7 +1,7 @@
 import db from '../config/database';
 
 export interface ConversationMessage {
-	role: 'user' | 'assistant';
+	role: 'system' | 'user' | 'assistant';
 	content: string;
 }
 

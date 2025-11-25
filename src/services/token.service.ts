@@ -9,7 +9,7 @@ export function countTokens(messages: ConversationMessage[]): number {
 
   for (const message of messages) {
     const tokens = encoding.encode(message.content);
-    totalTokens += tokens.length + 4; // ~4 tokens overhead per message
+    totalTokens += tokens.length + 4; 
   }
 
   encoding.free();
@@ -26,8 +26,7 @@ export function trimMessages(
   let rest = messages.slice(1);
 
   while (countTokens([systemMessage, ...rest]) > maxTokens && rest.length > 0) {
-    // Remove the oldest message first
-    rest = rest.slice(1);
+    rest = rest.slice(2);
   }
 
   return [systemMessage, ...rest];
