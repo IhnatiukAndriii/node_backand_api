@@ -1,4 +1,5 @@
-import knex, { Knex } from 'knex';
+import knex from 'knex';
+import type { Knex } from 'knex';
 
 const config: { [key: string]: Knex.Config } = {
 	development: {
@@ -11,7 +12,7 @@ const config: { [key: string]: Knex.Config } = {
 	test: {
 		client: 'better-sqlite3',
 		connection: {
-			filename: ':memory:',
+			filename: process.env.TEST_DB_PATH || './db/test_integration.db',
 		},
 		useNullAsDefault: true,
 	},

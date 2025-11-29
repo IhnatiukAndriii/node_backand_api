@@ -50,6 +50,9 @@ export function parseOpenAIResponse(response: OpenAIResponse): ParsedIntent {
 		}
 		return parsed as ParsedIntent;
 	} catch (error) {
+		if (error instanceof Error && error.message === 'Missing action field in OpenAI response') {
+			throw error;
+		}
 		throw new Error('Failed to parse OpenAI JSON response');
 	}
 }
