@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { getUserByPhoneNumber, findOrCreateUser } from '../services/user.service';
-import { listHabitsByUser, createHabit, updateHabit, deleteHabit } from '../services/habit.service';
+import { listHabitsByUser, createHabitDirect, updateHabit, deleteHabit } from '../services/habit.service';
 
 
 
@@ -31,11 +31,11 @@ export async function createHabitController(req: Request, res: Response, next: N
     }
 
     const user = await findOrCreateUser(phone_number);
-    const habit = await createHabit({
-      user_id: user.id,
+    const habit = await createHabitDirect({
+      userId: user.id,
       habit_name,
       frequency_type,
-      frequency_times: typeof frequency_times === 'string' ? frequency_times : JSON.stringify(frequency_times),
+      frequency_times: typeof frequency_times === 'string' ? frequency_times : String(frequency_times),
       status: 'active',
     });
 
@@ -50,12 +50,16 @@ export async function updateHabitController(req: Request, res: Response, next: N
     const { id } = req.params;
     const { habit_name, frequency_type, frequency_times, status } = req.body;
 
-    const updated = await updateHabit(Number(id), {
-      habit_name,
-      frequency_type,
-      frequency_times: frequency_times ? (typeof frequency_times === 'string' ? frequency_times : JSON.stringify(frequency_times)) : undefined,
-      status,
-    });
+    const updatedData: any = {};
+    if (habit_name) updatedData.habit_name = habit_name;
+    if (frequency_type) updatedData.frequency_type = frequency_type;
+    if (frequency_times !== undefined) {
+      updatedData.frequency_times = typeof frequency_times === 'number' ? frequency_times : 
+        Array.isArray(frequency_times) ? frequency_times : JSON.parse(frequency_times);
+    }
+    if (status) updatedData.status = status;
+
+    const updated = await updateHabit(Number(id), updatedData);
 
     if (!updated) {
       return res.status(404).json({ message: 'Habit not found' });

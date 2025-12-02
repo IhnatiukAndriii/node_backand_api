@@ -34,6 +34,22 @@ export async function createHabit(
     return row as Habit;
 }
 
+export async function createHabitDirect(
+{ userId, habit_name, frequency_type, frequency_times, status }: { userId: number; habit_name: string; frequency_type: string; frequency_times: string | number; status: string; },
+   ): Promise<Habit> {
+  const data = {
+    user_id: userId,
+    habit_name,
+    frequency_type,
+    frequency_times: typeof frequency_times === 'number' ? String(frequency_times) : frequency_times,
+    status,
+  };
+  const inserted = await db<Habit>('habits')
+    .insert(data)
+    .returning('*');
+  return Array.isArray(inserted) ? inserted[0] : inserted;
+}
+
 export async function listHabitsByUser(userId: number): Promise<Habit[]> {
     console.log('>>> listHabitsByUser called with userId:', userId);
     const habits = await db<Habit>('habits')
