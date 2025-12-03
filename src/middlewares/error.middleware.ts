@@ -1,13 +1,35 @@
 import { Request, Response, NextFunction } from 'express';
+import logger from '../utils/logger';
+import { AppError } from '../utils/errors';
 
-// Basic centralized error handling middleware
 export default function errorMiddleware(
-	err: Error,
-	_req: Request,
-	res: Response,
-	_next: NextFunction,
+  err: Error,
+  req: Request,
+  res: Response,
+  _next: NextFunction
 ) {
-	// eslint-disable-next-line no-console
-	console.error(err);
-	res.status(500).json({ message: 'Internal server error' });
+  logger.error('Error occurred', {
+    requestId: req.id,
+    error: err.message,
+    stack: err.stack,
+    path: req.path,
+  });
+
+  if (err instanceof AppError) {
+    return res.status(err.statusCode).json({
+      error: {
+        message: err.message,
+        code: err.code,
+        requestId: req.id,
+      },
+    });
+  }
+
+  res.status(500).json({
+    error: {
+      message: 'Internal server error',
+      code: 'INTERNAL_ERROR',
+      requestId: req.id,
+    },
+  });
 }

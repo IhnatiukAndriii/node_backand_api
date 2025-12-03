@@ -10,6 +10,9 @@ export type IntentAction =
 	| 'update'
 	| 'delete'
 	| 'list'
+	| 'complete'
+	| 'stats'
+	| 'history'
 	| 'clarification';
 
 export interface ParsedIntent {
@@ -18,18 +21,23 @@ export interface ParsedIntent {
 	habit_id?: number;
 	frequency_type?: string;
 	frequency_times?: number | string[];
+	scheduled_time?: string;
+	note?: string;
 	clarification_question?: string;
+	assistant_message?: string;
 }
 
 export interface OpenAIResponse {
 	content: string;
 }
 
+import logger from '../utils/logger';
+
 export async function sendChatRequest(
 	messages: ConversationMessage[],
 ): Promise<OpenAIResponse> {
 	const model = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
-	console.log('>>> sendChatRequest USING MODEL:', model);
+	logger.info('sendChatRequest', { model });
 
 	const response = await openai.chat.completions.create({
 		model,

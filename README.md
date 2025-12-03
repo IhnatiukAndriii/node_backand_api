@@ -4,12 +4,18 @@ A production-ready Node.js + TypeScript backend that processes natural language 
 
 ## Features
 
-- Natural language processing for habit management (create, update, delete, list)
+- Natural language processing for habit management (create, update, delete, list, complete)
+- Habit completion tracking with statistics and streaks
+- Multi-turn dialogue with context management
 - Conversation history with automatic token management
 - RESTful API with comprehensive error handling
-- SQLite database with migration support
+- Professional logging system with Winston
+- Request tracking with unique IDs
+- Input validation with Zod
+- SQLite database with migrations and indexes
 - Full test coverage (unit + integration tests)
-- Rate limiting and security middlewares
+- Graceful shutdown for zero-downtime deployments
+- Production-ready architecture
 
 ## Tech Stack
 
@@ -89,6 +95,8 @@ Environment variables (see `.env.example` for details):
 | `OPENAI_MODEL` | No | gpt-4.1-mini | OpenAI model to use |
 | `MAX_TOKENS_PER_REQUEST` | No | 4000 | Token limit per request |
 | `TEST_DB_PATH` | No | ./db/test_integration.db | Test database path |
+| `LOG_LEVEL` | No | info | Logging level (error/warn/info/debug) |
+| `DATABASE_PATH` | No | ./database.sqlite | Production database path |
 
 ## Running the Application
 
@@ -161,6 +169,9 @@ Process natural language input to manage habits.
 - Update: "Change my water habit to 5 times a day"
 - Delete: "Remove my exercise habit"
 - List: "Show me all my habits"
+- Complete: "Done with water" or "I drank water"
+- Stats: "Show my statistics" or "How am I doing?"
+- History: "History of water habit"
 
 ### GET /api/habits
 
@@ -190,6 +201,28 @@ curl "http://localhost:3000/api/habits?phoneNumber=%2B1234567890"
   ]
 }
 ```
+
+### POST /api/completions
+
+Mark a habit as complete.
+
+**Request:**
+```json
+{
+  "habit_id": 1,
+  "user_id": 1,
+  "scheduled_time": "08:00",
+  "note": "Felt great!"
+}
+```
+
+### GET /api/completions/:habitId
+
+Get completion history for a habit.
+
+**Query params:**
+- `startDate` (optional): Filter from date
+- `endDate` (optional): Filter to date
 
 ### GET /api/health
 

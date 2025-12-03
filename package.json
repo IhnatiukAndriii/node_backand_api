@@ -11,6 +11,7 @@
     "test:unit": "vitest run tests/unit",
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "vitest run tests/e2e",
     "migrate": "ts-node migrate.ts",
     "migrate:rollback": "ts-node migrate.ts rollback",
     "lint": "eslint src/**/*.ts",
@@ -33,7 +34,9 @@
     "express": "^5.1.0",
     "knex": "^3.1.0",
     "openai": "^6.9.1",
-    "tiktoken": "^1.0.22"
+    "tiktoken": "^1.0.22",
+    "winston": "^3.18.3",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

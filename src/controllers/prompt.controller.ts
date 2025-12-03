@@ -14,6 +14,19 @@ import { createHabit, listHabitsByUser, deleteHabit, updateHabit, findHabitByNam
 import {countTokens, trimMessages} from '../services/token.service';
 import { updateTotalTokens } from '../services/conversation.service';
 import db from '../config/database';
+import {
+  markHabitComplete,
+  getUserStatistics,
+  getCompletionHistory,
+} from '../services/complection.service';
+import {
+  getPendingIntent,
+  savePendingIntent,
+  clearPendingIntent,
+  mergePendingWithNewInput,
+  identifyMissingFields,
+} from '../services/context.service';
+import logger from '../utils/logger';
 
 export async function handlePrompt(
   req: Request,
@@ -34,6 +47,9 @@ export async function handlePrompt(
     await addMessageToConversation(user.id, 'user', text);
     const history = await getConversation(user.id);
 
+  
+    const pendingIntent = await getPendingIntent(user.id);
+
     const messagesFromDb = JSON.parse(history.messages) as {
       role: 'user' | 'assistant';
       content: string;
@@ -44,12 +60,20 @@ export async function handlePrompt(
       ...messagesFromDb,
     ];
 
+    if (pendingIntent) {
+      const contextMessage = `Previous incomplete request: ${JSON.stringify(pendingIntent)}. User is now providing additional information.`;
+      messagesForAI.splice(1, 0, {
+        role: 'system',
+        content: contextMessage,
+      });
+    }
+
     const MAX_TOKENS_PER_REQUEST = Number(process.env.MAX_TOKENS_PER_REQUEST) || 4000;
     const currentTokens = countTokens(messagesForAI);
-    console.log(`>>> Current tokens: ${currentTokens}, Max tokens: ${MAX_TOKENS_PER_REQUEST}`);
+    logger.info('Token count', { currentTokens, maxTokens: MAX_TOKENS_PER_REQUEST });
 
     if (currentTokens > MAX_TOKENS_PER_REQUEST) {
-      console.log('>>> Token limit exceeded! Trimming old messages...');
+      logger.warn('Token limit exceeded, trimming messages', { currentTokens, maxTokens: MAX_TOKENS_PER_REQUEST });
       messagesForAI = trimMessages(messagesForAI, MAX_TOKENS_PER_REQUEST);
 
       const trimmedMessagesForDb = messagesForAI.slice(1);
@@ -59,13 +83,47 @@ export async function handlePrompt(
           messages: JSON.stringify(trimmedMessagesForDb),
           updated_at: db.fn.now(),
         });
-      console.log(`>>> Trimmed to ${countTokens(messagesForAI)} tokens`);
+      logger.info('Messages trimmed', { newTokenCount: countTokens(messagesForAI) });
     }
 
     await updateTotalTokens(user.id, countTokens(messagesForAI));
 
     const aiResponse = await sendChatRequest(messagesForAI);
-    const parsedIntent = parseOpenAIResponse(aiResponse);
+    let parsedIntent = parseOpenAIResponse(aiResponse);
+
+    if (pendingIntent && parsedIntent.action !== 'clarification') {
+      parsedIntent = mergePendingWithNewInput(pendingIntent, parsedIntent);
+      await clearPendingIntent(user.id);
+    }
+
+    if (parsedIntent.action === 'clarification') {
+      const missingFields = identifyMissingFields(parsedIntent);
+      
+      if (missingFields.length > 0) {
+        await savePendingIntent(user.id, {
+          action: parsedIntent.action,
+          habit_name: parsedIntent.habit_name,
+          frequency_type: parsedIntent.frequency_type,
+          frequency_times: parsedIntent.frequency_times,
+          missing_fields: missingFields,
+          clarification_asked: parsedIntent.clarification_question,
+        });
+      }
+
+      await addMessageToConversation(
+        user.id,
+        'assistant',
+        JSON.stringify(parsedIntent),
+      );
+
+      return res.status(200).json({
+        phone_number: user.phone_number,
+        textReceived: text,
+        intent: parsedIntent,
+        message: parsedIntent.assistant_message || parsedIntent.clarification_question,
+        history,
+      });
+    }
 
     await addMessageToConversation(
       user.id,
@@ -115,13 +173,70 @@ if (parsedIntent.action === 'create') {
   
   await deleteHabit(habitToDelete.id);
   result = { message: 'Habit deleted successfully' };
+} else if (parsedIntent.action === 'complete') {
+  if (!parsedIntent.habit_name) {
+    return res.status(400).json({
+      message: 'habit_name is required for complete action',
+    });
+  }
+  
+  const habitToComplete = await findHabitByName(user.id, parsedIntent.habit_name);
+  
+  if (!habitToComplete) {
+    return res.status(404).json({
+      message: `Habit "${parsedIntent.habit_name}" not found`,
+    });
+  }
+  
+  const completion = await markHabitComplete(
+    user.id,
+    habitToComplete.id,
+    parsedIntent.scheduled_time,
+    parsedIntent.note
+  );
+  
+  result = {
+    message: 'Habit marked as complete',
+    completion,
+    habit: habitToComplete,
+  };
+} else if (parsedIntent.action === 'stats') {
+  const stats = await getUserStatistics(user.id);
+  result = {
+    message: 'User statistics',
+    statistics: stats,
+  };
+} else if (parsedIntent.action === 'history') {
+  if (!parsedIntent.habit_name) {
+    return res.status(400).json({
+      message: 'habit_name is required for history action',
+    });
+  }
+  
+  const habitForHistory = await findHabitByName(user.id, parsedIntent.habit_name);
+  
+  if (!habitForHistory) {
+    return res.status(404).json({
+      message: `Habit "${parsedIntent.habit_name}" not found`,
+    });
+  }
+  
+  const history = await getCompletionHistory(habitForHistory.id);
+  result = {
+    message: 'Habit completion history',
+    habit: habitForHistory,
+    history,
+  };
 }
+
+    await clearPendingIntent(user.id);
 
     return res.status(200).json({
       phone_number: user.phone_number,
       textReceived: text,
       intent: parsedIntent,
       result,
+      message: parsedIntent.assistant_message,
       history,
     });
   } catch (error) {
