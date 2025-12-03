@@ -1,7 +1,5 @@
-import { stat } from 'fs';
 import db from '../config/database';
 import { ParsedIntent } from './openai.service';
-import e from 'express';
 
 export interface Habit {
     id: number;

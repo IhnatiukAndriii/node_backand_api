@@ -1,0 +1,164 @@
+Habit and Routine Management Backend Specification
+=================================================
+
+1. Overview
+
+This project is a Node.js + TypeScript backend for managing user habits and routines via natural language input.
+
+Users will send free-text messages (for example from a future WhatsApp integration). The backend will:
+- Receive the text.
+- Send it to OpenAI API (or LangChain-based flow that uses OpenAI under the hood).
+- Decide whether the intent is to CREATE, UPDATE, DELETE, or LIST habits.
+- Translate the natural language into structured data.
+- Store the data in a local database.
+
+Scope is limited to the backend only. No Twilio or cron scheduling is implemented in this task. The expected effort is up to ~10 hours of work for an experienced developer.
+
+The code must be production-ready in structure (clear folders, configuration, error handling) but simple enough to run locally.
+
+2. Tech Stack & General Requirements
+
+- Runtime: Node.js (LTS).
+- Language: TypeScript.
+- Framework: Any minimal HTTP framework (for example Express, Fastify, or similar).
+- Tests: Any common Node.js test framework (for example Vitest, Jest, or similar).
+- Database: Simple relational/local DB (e.g. SQLite or PostgreSQL) with migrations stored in the repository.
+- Version control: Project hosted on GitHub repository (ready to clone and run).
+- Environment variables:
+- OPENAI_API_KEY (provided by client).
+- DB connection string (for local DB).
+- The backend must be runnable locally with simple commands (e.g. `npm install`, `npm run dev`, `npm test`).
+
+3. Data Model
+
+3.1 Users Table
+- id (primary key)
+- phone_number (string, unique)
+
+3.2 Habits Table
+- id (primary key)
+- user_id (foreign key to Users.id)
+- habit_name (string) - short description like "drink water"
+- frequency_type (string) - e.g. "daily", "weekly", "times_per_day"
+- frequency_times (JSON or text) - list of times or structured representation
+- created_at (timestamp)
+- updated_at (timestamp)
+- status (optional, e.g. "active" / "deleted")
+
+All migrations must be included in the repo so the database schema can be created from
+
+scratch with one command.
+
+4. REST API Endpoints
+
+The backend exposes a small REST API. All human text is sent in a single "prompt" endpoint, which then routes internally to CRUD logic.
+
+4.1 POST /prompt Input:
+- body.text: string - free-text message from the user (e.g. "I want to drink water three times a day").
+- body.phoneNumber: string - user phone number.
+
+Behavior:
+- Call OpenAI (or LangChain) with a system prompt that:
+- Identifies whether the intent is CREATE, UPDATE, DELETE, or LIST.
+- Extracts structured habit data (habit name, frequency type, times).
+- Based on the intent, internally call one of the CRUD operations:
+- CREATE: create a new habit for this phone number.
+- UPDATE: update an existing habit's frequency or status.
+- DELETE: mark habit as deleted or remove it.
+- LIST: return all habits for this user.
+- Return a JSON response with:
+- action: "create" | "update" | "delete" | "list"
+- result: structured data (habit(s) after action).
+
+4.2 GET /habits?phoneNumber=...
+Returns all habits for the given phone number (user).
+
+4.3 (Internal) CRUD routes
+Developers may implement internal routes or service-layer functions for:
+- createHabit(userId, habitData)
+- updateHabit(habitId, habitData)
+- deleteHabit(habitId)
+- listHabits(userId)
+
+5. OpenAI / LangChain Integration
+
+- Every user text input (via /prompt) must go through OpenAI (or LangChain using OpenAI).
+- Use a clear system prompt that defines the flow:
+1. Detect whether the user wants to SAVE (create/update), DELETE, or LIST habits.
+2. If SAVE:
+- Extract habit name.
+- Extract frequency and convert to structured shape, e.g.:
+- frequency_type: "times_per_day"
+- frequency_times: ["08:00", "13:00", "18:00"]
+3. If DELETE:
+- Identify which habit should be deleted.
+4. If LIST:
+- Return intent "list".
+- The model output should be in a strict JSON format that the backend can parse safely. Example user flow:
+- User: "I want to schedule to drink water three times a day."
+
+- Model output (example):
+- action: "create"
+- habit_name: "drink water"
+- frequency_type: "times_per_day"
+- frequency_times: 3 (or a structure that will later be extended to exact times)
+
+The backend will:
+- Save the habit.
+- Optionally ask the user (in the future WhatsApp integration) to provide exact times.
+
+6. Testing Requirements
+
+The project must include both unit tests and at least one "production-like" test.
+
+6.1 Unit Tests
+- Use mocks for OpenAI / LangChain so that tests do not call the real API.
+- Test the following at minimum:
+- Parsing of model JSON into internal structures.
+- CRUD logic for creating, updating, deleting, and listing habits.
+- Mapping between phone_number and user + habits in the database.
+- Validation of inputs (e.g. missing phoneNumber, invalid frequency).
+
+6.2 Integration / Production Test
+- Include one test (or small group of tests) that:
+- Uses a real local database (not in-memory mocks).
+- Uses a real OpenAI API call (skipped by default unless OPENAI_API_KEY is set).
+- Sends example prompts (e.g. "remind me to drink water three times a day").
+- Asserts that the habit is stored correctly in the database.
+
+Make it easy to run these tests via npm scripts:
+- `npm test` for unit tests.
+- `npm run test:integration` (or similar) for the production-like test.
+
+7. Local Development & Running
+
+The repository must include:
+
+- README with:
+- How to install dependencies.
+- How to configure environment variables.
+- How to run database migrations.
+- How to start the server locally.
+- How to run unit and integration tests.
+
+- Example commands (for guidance):
+- `npm install`
+- `npm run migrate`
+- `npm run dev`
+- `npm test`
+
+The backend must be usable from a terminal by sending HTTP requests (e.g. via curl or Postman). This is how the client will manually test flows like:
+- Create habit via POST /prompt.
+- List habits via GET /habits.
+- Update/delete by sending appropriate text prompts.
+
+8. Out of Scope (Future Work)
+
+The following are explicitly **out of scope** for this 10-hour project but should be considered in the design:
+
+- Twilio / WhatsApp integration.
+- Actual cron job scheduling for reminders.
+- Advanced authentication/authorization.
+- Deployment to production hosting (client may deploy later to services like Railway).
+
+The code should, however, be structured in a way that these features can be added later without major refactoring.
